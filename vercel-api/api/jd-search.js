@@ -28,9 +28,12 @@ async function jdApi(method, paramJson) {
 
   const qs = Object.entries(params).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
   const resp = await fetch(`${API_URL}?${qs}`);
-  const data = await resp.json();
+  const text = await resp.text();
+  let data;
+  try { data = JSON.parse(text); } catch(e) { throw new Error(`JD returned non-JSON: ${text.substring(0,200)}`); }
   const key = Object.keys(data).find(k => k.includes('responce'));
-  if (!key) throw new Error('Invalid JD response');
+  console.error('JD raw:', text.substring(0,500));
+  if (!key) throw new Error(`Invalid JD response: ${text.substring(0,200)}`);
   const outer = data[key];
   if (outer.code !== '0') throw new Error(outer.zh_desc || outer.message || `Error ${outer.code}`);
   return JSON.parse(outer.queryResult || outer.result || '{}');
