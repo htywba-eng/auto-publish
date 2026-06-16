@@ -1,0 +1,83 @@
+name: Daily Content Cruise
+
+on:
+  schedule:
+    - cron: '43 */6 * * *'   # 每6小时
+    - cron: '13 */3 * * *'   # 每3小时工作候选
+  workflow_dispatch:          # 手动触发
+
+jobs:
+  cruise-status:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: UUMit Status Cruise
+        env:
+          UUMIT_API_KEY: ${{ secrets.UUMIT_API_KEY }}
+          UUMIT_USER_ID: ${{ secrets.UUMIT_USER_ID }}
+        run: |
+          # 状态对账
+          curl -s -H "X-Api-Key: $UUMIT_API_KEY" \
+               -H "X-Platform-User-Id: $UUMIT_USER_ID" \
+               "https://api.uumit.com/api/v1/agent/cruise?include=all" \
+               > cruise_result.json
+
+          # 检查关键变化
+          BALANCE=$(jq -r '.data.ut.available // "0"' cruise_result.json)
+          echo "UT Balance: $BALANCE"
+
+          # 有异常才通知
+          if [ "$(echo "$BALANCE < 100" | bc)" -eq 1 ]; then
+            echo "⚠️ Low balance alert: $BALANCE UT"
+          fi
+
+  cruise-work:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: UUMit Work Candidates
+        env:
+          UUMIT_API_KEY: ${{ secrets.UUMIT_API_KEY }}
+          UUMIT_USER_ID: ${{ secrets.UUMIT_USER_ID }}
+        run: |
+          # 拉取任务大厅
+          curl -s -H "X-Api-Key: $UUMIT_API_KEY" \
+               -H "X-Platform-User-Id: $UUMIT_USER_ID" \
+               "https://api.uumit.com/api/v1/tasks/hall?page=1&page_size=20" \
+               > tasks.json
+
+          COUNT=$(jq '.data.items | length' tasks.json)
+          echo "Available tasks: $COUNT"
+
+          # 筛选高质量任务（>200 UT）
+          QUALITY=$(jq '[.data.items[] | select(.bounty > 200)] | length' tasks.json)
+          if [ "$QUALITY" -gt 0 ]; then
+            echo "🔥 $QUALITY high-value tasks available!"
+            jq '[.data.items[] | select(.bounty > 200) | {title, bounty}]' tasks.json
+          fi
+
+  daily-claim:
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '0 0 * * *'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Claim AI Credits
+        env:
+          UUMIT_API_KEY: ${{ secrets.UUMIT_API_KEY }}
+          UUMIT_USER_ID: ${{ secrets.UUMIT_USER_ID }}
+        run: |
+          curl -s -X POST \
+               -H "X-Api-Key: $UUMIT_API_KEY" \
+               -H "X-Platform-User-Id: $UUMIT_USER_ID" \
+               "https://api.uumit.com/api/v1/llm/cyber-egg/claim"
+          echo "✅ Daily AI credits claimed"
