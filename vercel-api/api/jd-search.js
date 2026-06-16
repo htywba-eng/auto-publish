@@ -1,4 +1,4 @@
-const crypto = require('crypto');
+import crypto from 'crypto';
 
 const APP_KEY = process.env.JD_APP_KEY || 'b32dacfd38e92e383894f2973c1bdb80';
 const APP_SECRET = process.env.JD_APP_SECRET || '4809677daa694df3ab8c6d161aa2fd18';
