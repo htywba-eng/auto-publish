@@ -13,7 +13,10 @@ function jdSign(params, secret) {
 async function jdApi(method, paramJson) {
   const now = new Date();
   const pad = n => String(n).padStart(2, '0');
-  const timestamp = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+  // 京东要求 yyyy-MM-dd HH:mm:ss 格式，且必须是北京时间，与服务器时间差<5分钟
+  // Vercel运行在美国，需要手动构造北京时间
+  const bjTime = new Date(now.getTime() + 8 * 3600000); // UTC+8
+  const timestamp = `${bjTime.getUTCFullYear()}-${pad(bjTime.getUTCMonth()+1)}-${pad(bjTime.getUTCDate())} ${pad(bjTime.getUTCHours())}:${pad(bjTime.getUTCMinutes())}:${pad(bjTime.getUTCSeconds())}`;
 
   const params = {
     method,
